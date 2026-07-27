@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  tts-service:
+    container_name: personalvoice-tts
+
+    build:
+      context: ../worker/tts-service
+
+    ports:
+      - "8001:8001"
+
+    environment:
+      COQUI_TOS_AGREED: "1"
+
+    volumes:
+      - xtts-models:/root/.local/share/tts
+
+    restart: unless-stopped
+
+volumes:
+  xtts-models:

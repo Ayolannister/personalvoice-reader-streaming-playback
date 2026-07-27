@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-ink text-paper font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-lamp-400/30 text-paper;
+  }
+
+  * {
+    @apply border-ink-hairline;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme("colors.lamp.400");
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Signature element: the ribbon bookmark. A diagonal-cut tab that marks
+     "where you stopped" on a cover, and reused as the player's progress fill. */
+  .ribbon-tab {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.ink.hairline") transparent;
+  }
+}

@@ -1,0 +1,22 @@
+# Install only when you want real voice cloning (not needed to run the
+# rest of the app). Needs internet access on first use to fetch the
+# XTTS v2 model (~2GB, served via coqui.gateway.scarf.sh) on first call.
+# GPU is optional but strongly recommended -- cloning runs on CPU too,
+# just slower.
+#
+# coqui-tts 0.24.2 supports Python 3.9-3.12 (Requires-Python: <3.13,>=3.9
+# per its published metadata) -- so it does NOT actually need a separate
+# Python 3.11 environment. The backend can install this directly.
+#
+# Strongly recommended: install the CPU-only torch build first, or the
+# default PyPI wheel pulls several GB of unneeded NVIDIA CUDA libraries:
+#
+#   pip install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt -r requirements-tts.txt
+#
+# Until installed, set TTS_ENGINE=dummy in your .env to develop and test
+# the voice pipeline (upload, status transitions, storage) without these.
+
+torch==2.4.1
+torchaudio==2.4.1
+coqui-tts==0.24.2

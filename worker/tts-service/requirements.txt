@@ -1,0 +1,12 @@
+# torch/torchaudio are intentionally installed separately from the CPU
+# index in the Dockerfile BEFORE this file — the default PyPI wheel
+# bundles ~2-5GB of NVIDIA CUDA libraries that are dead weight without a
+# GPU, and have been the cause of "no space left on device" Docker build
+# failures. Installing the CPU build first means these lines are already
+# satisfied by the time pip gets to them and won't be re-fetched.
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+torch==2.4.1
+torchaudio==2.4.1
+coqui-tts==0.24.2
