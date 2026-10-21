@@ -4,9 +4,6 @@
 #   backend      http://localhost:8000   (API docs at /docs)
 #   tts-service  http://localhost:8001   (XTTS v2, Python 3.11)
 #   postgres     localhost:5432
-#
-# Data lives in named volumes, so it survives restarts and rebuilds.
-# `docker compose down -v` wipes everything (books, voices, audio, DB).
 
 name: personalvoice
 
@@ -29,8 +26,11 @@ services:
     restart: unless-stopped
 
   tts-service:
-    build:
-      context: ../worker/tts-service
+    # Reuses the image you already built (no 4 GB rebuild).
+    # To rebuild from source instead, replace this line with:
+    #   build:
+    #     context: ../worker/tts-service
+    image: docker-tts-service:latest
     environment:
       COQUI_TOS_AGREED: "1"
     ports:
@@ -49,15 +49,12 @@ services:
       context: ../backend
     environment:
       DATABASE_URL: postgresql+psycopg://pvreader:pvreader@postgres:5432/pvreader
-      # Set TTS_ENGINE=dummy to run the whole app without the model
-      # (silent audio, instant). xtts_remote = real cloning.
       TTS_ENGINE: ${TTS_ENGINE:-xtts_remote}
       TTS_SERVICE_URL: http://tts-service:8001
       CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
     ports:
       - "8000:8000"
     volumes:
-      # Uploaded books, covers, voice recordings and generated chapter audio.
       - app-storage:/app/app/storage
     depends_on:
       postgres:
@@ -87,3 +84,5 @@ volumes:
   pg-data:
   app-storage:
   xtts-models:
+    external: true
+    name: docker_xtts-models
