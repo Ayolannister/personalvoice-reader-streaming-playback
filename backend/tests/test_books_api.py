@@ -31,6 +31,8 @@ def test_upload_txt_book_and_list():
     assert body["format"] == "txt"
     assert len(body["chapters"]) == 2
     assert body["currentChapterId"] == body["chapters"][0]["id"]
+    # titled after the uploaded file, not the internal storage ID
+    assert body["title"] == "mybook"
 
     list_resp = client.get("/books")
     assert list_resp.status_code == 200

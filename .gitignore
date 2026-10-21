@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Secrets and local config (commit the .example files instead)
+.env
+.env.local
+*.env
+!*.env.example
+
+# Runtime data: uploaded books, voice recordings, generated audio, DB
+backend/app/storage/
+*.db
+*.sqlite3
+
+# Model weights
+models/*
+!models/README.md
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/

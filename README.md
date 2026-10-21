@@ -24,10 +24,10 @@ regenerates twice. Single user, no accounts, no marketplace, no sharing.
       concatenated to MP3 with ffmpeg), cache it, and stream it to a
       real `<audio>`-backed player: seek, skip ±15s, speed, working
       sleep timer, resume position saved to the backend.
-- [ ] **Milestone 5 — Local packaging.** Full docker-compose (adds
-      Postgres, Redis, frontend to the backend + tts-service pair
-      already in `docker/docker-compose.yml`) for one-command local
-      setup.
+- [x] **Milestone 5 — Local packaging.** One-command local stack in
+      `docker/docker-compose.yml`: Postgres, backend, tts-service and
+      frontend, with healthchecks and persistent volumes. See
+      `docker/README.md`.
 
 Each milestone is built and verified on its own before the next starts.
 
@@ -37,7 +37,7 @@ Each milestone is built and verified on its own before the next starts.
 frontend/            Next.js app (built — see frontend/README.md)
 backend/              FastAPI service (built — see backend/README.md)
 worker/tts-service/   Dockerized XTTS v2 cloning service (Python 3.11)
-docker/               docker-compose (backend + tts-service so far)
+docker/               docker-compose (full local stack)
 infra/                env templates, bootstrap scripts (Milestone 5)
 docs/                 architecture notes, API contracts
 models/               local TTS model weights (not committed)

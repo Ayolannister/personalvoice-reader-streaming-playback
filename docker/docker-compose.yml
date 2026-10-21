@@ -1,22 +1,89 @@
-version: "3.9"
+# One-command local stack: docker compose up --build  (run from this folder)
+#
+#   frontend     http://localhost:3000
+#   backend      http://localhost:8000   (API docs at /docs)
+#   tts-service  http://localhost:8001   (XTTS v2, Python 3.11)
+#   postgres     localhost:5432
+#
+# Data lives in named volumes, so it survives restarts and rebuilds.
+# `docker compose down -v` wipes everything (books, voices, audio, DB).
+
+name: personalvoice
 
 services:
-  tts-service:
-    container_name: personalvoice-tts
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pvreader
+      POSTGRES_PASSWORD: pvreader
+      POSTGRES_DB: pvreader
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pvreader -d pvreader"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
+  tts-service:
     build:
       context: ../worker/tts-service
-
-    ports:
-      - "8001:8001"
-
     environment:
       COQUI_TOS_AGREED: "1"
-
+    ports:
+      - "8001:8001"
     volumes:
       - xtts-models:/root/.local/share/tts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
 
+  backend:
+    build:
+      context: ../backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://pvreader:pvreader@postgres:5432/pvreader
+      # Set TTS_ENGINE=dummy to run the whole app without the model
+      # (silent audio, instant). xtts_remote = real cloning.
+      TTS_ENGINE: ${TTS_ENGINE:-xtts_remote}
+      TTS_SERVICE_URL: http://tts-service:8001
+      CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      # Uploaded books, covers, voice recordings and generated chapter audio.
+      - app-storage:/app/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tts-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
+  pg-data:
+  app-storage:
   xtts-models:

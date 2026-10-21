@@ -80,6 +80,15 @@ def test_generate_chapter_audio_end_to_end(tmp_path):
     assert audio_resp.headers["content-type"] == "audio/mpeg"
     assert len(audio_resp.content) > 0
 
+    # <audio> seeking depends on HTTP Range support (206 Partial Content).
+    # Starlette < 0.39 silently ignored Range and always sent the whole file.
+    range_resp = client.get(
+        f"/books/{book['id']}/chapters/{chapter_id}/audio", headers={"Range": "bytes=0-99"}
+    )
+    assert range_resp.status_code == 206
+    assert len(range_resp.content) == 100
+    assert range_resp.content == audio_resp.content[:100]
+
 
 def test_generate_requires_a_voice(tmp_path):
     book = _upload_book(tmp_path)

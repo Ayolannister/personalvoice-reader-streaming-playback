@@ -25,6 +25,23 @@ def _extension(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
 
+def _display_title(parsed_title: str, book_id: str, original_filename: str | None) -> str:
+    """
+    Parsers fall back to the file's stem when a book has no title metadata
+    (always for TXT, sometimes for PDF). The stored file is named after the
+    book's UUID, so that fallback would title the book with its internal ID.
+    Use the name of the file the person actually uploaded instead.
+    """
+    title = (parsed_title or "").strip()
+    if title and title != book_id:
+        return title
+    if original_filename:
+        stem = original_filename.rsplit(".", 1)[0].strip()
+        if stem:
+            return stem
+    return "Untitled"
+
+
 @router.get("/books", response_model=list[BookOut])
 def list_books(db: Session = Depends(get_db)):
     books = db.execute(select(Book)).scalars().all()
@@ -68,7 +85,7 @@ async def upload_book(file: UploadFile, db: Session = Depends(get_db)):
 
     book = Book(
         id=book_id,
-        title=parsed.title.strip() or (file.filename or "Untitled"),
+        title=_display_title(parsed.title, book_id, file.filename),
         author=parsed.author.strip() or "Unknown",
         format=ext,
         status="ready",

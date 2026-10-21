@@ -24,7 +24,7 @@ from app.tts.xtts_remote_engine import XTTSRemoteEngine
 def mock_tts_server():
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "mock_tts_service:app", "--port", "8901"],
-        cwd="/tmp",
+        cwd=str(Path(__file__).resolve().parent),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
