@@ -1,6 +1,10 @@
-from pathlib import Path
+import hashlib
+import json
 import os
 import time
+import wave
+from pathlib import Path
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -53,6 +57,37 @@ def _publish_checkpoint(chapter: Chapter, segment_paths: list[Path], output_path
     return duration
 
 
+def _segment_is_complete(path: Path) -> bool:
+    """A segment WAV left over from an earlier run, fully written and readable."""
+    try:
+        with wave.open(str(path), "rb") as w:
+            return w.getnframes() > 0
+    except Exception:
+        return False
+
+
+def _prepare_work_dir(work_dir: Path, segments: list[str], voice_id: str) -> None:
+    """
+    Segment WAVs are kept in work_dir until the chapter is fully done, so an
+    interrupted generation can resume instead of starting over. They are only
+    reusable if they came from the same text split and the same voice, so a
+    manifest records both; on a mismatch the old segments are discarded.
+    """
+    fingerprint = hashlib.sha256(
+        json.dumps({"voice": voice_id, "segments": segments}).encode("utf-8")
+    ).hexdigest()
+    manifest = work_dir / "manifest.json"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        previous = json.loads(manifest.read_text()).get("fingerprint")
+    except Exception:
+        previous = None
+    if previous != fingerprint:
+        for old in work_dir.glob("segment_*.wav"):
+            old.unlink(missing_ok=True)
+        manifest.write_text(json.dumps({"fingerprint": fingerprint}))
+
+
 def _run_generation(book_id: str, chapter_id: str, voice_id: str):
     """Runs after the response is sent; opens its own DB session."""
     db = SessionLocal()
@@ -74,29 +109,38 @@ def _run_generation(book_id: str, chapter_id: str, voice_id: str):
             db.commit()
 
             work_dir = settings.audio_dir / f"{book_id}_{chapter_id}_segments"
-            work_dir.mkdir(parents=True, exist_ok=True)
+            _prepare_work_dir(work_dir, segments, voice_id)
             output_path = settings.audio_dir / f"{chapter_id}.mp3"
             segment_paths = []
+            published_this_run = False
 
             for i, segment in enumerate(segments):
                 seg_path = work_dir / f"segment_{i:04d}.wav"
+                reused = _segment_is_complete(seg_path)
 
-                start = time.time()
-                print(f"\nGenerating chunk {i + 1}/{len(segments)}", flush=True)
-
-                engine.synthesize(segment, Path(voice.model_path), seg_path)
-
-                elapsed = time.time() - start
-                print(f"Chunk {i + 1} finished in {elapsed:.2f} seconds", flush=True)
+                if reused:
+                    print(f"Reusing chunk {i + 1}/{len(segments)} from an earlier run", flush=True)
+                else:
+                    start = time.time()
+                    print(f"\nGenerating chunk {i + 1}/{len(segments)}", flush=True)
+                    # Write to a temp name and rename, so a stop mid-write
+                    # never leaves a truncated segment that looks finished.
+                    tmp_seg = seg_path.with_suffix(".partial.wav")
+                    engine.synthesize(segment, Path(voice.model_path), tmp_seg)
+                    os.replace(tmp_seg, seg_path)
+                    print(f"Chunk {i + 1} finished in {time.time() - start:.2f} seconds", flush=True)
 
                 segment_paths.append(seg_path)
                 chapter.generation_segments_done = i + 1
 
                 is_last = i == len(segments) - 1
-                is_checkpoint = i == 0 or (i + 1) % CHECKPOINT_EVERY == 0 or is_last
+                is_checkpoint = is_last or (
+                    not reused and (not published_this_run or (i + 1) % CHECKPOINT_EVERY == 0)
+                )
                 if is_checkpoint:
                     checkpoint_start = time.time()
                     _publish_checkpoint(chapter, segment_paths, output_path, is_final=is_last)
+                    published_this_run = True
                     print(
                         f"Published checkpoint through segment {i + 1} "
                         f"({chapter.duration_seconds:.1f}s of audio) in "
@@ -106,7 +150,7 @@ def _run_generation(book_id: str, chapter_id: str, voice_id: str):
 
                 db.commit()
 
-            for p in segment_paths:
+            for p in work_dir.iterdir():
                 p.unlink(missing_ok=True)
             work_dir.rmdir()
         except Exception:

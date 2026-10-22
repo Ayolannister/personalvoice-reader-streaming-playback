@@ -11,7 +11,9 @@ Run standalone:  uvicorn mock_tts_service:app --port 8001  (from tests/)
 """
 import io
 import math
+import os
 import struct
+import time
 import wave
 
 from fastapi import FastAPI, Form, HTTPException, UploadFile
@@ -22,6 +24,9 @@ app = FastAPI(title="Mock TTS service")
 PROFILE_PREFIX = b"FAKE_TORCH_TENSOR_BYTES:"
 SAMPLE_RATE = 24000  # matches the real service's XTTS output rate
 WORDS_PER_SECOND = 2.5
+# Optional artificial slowness, to mimic CPU inference when testing
+# interruption and resume (e.g. MOCK_TTS_DELAY_SECONDS=1).
+DELAY_SECONDS = float(os.environ.get("MOCK_TTS_DELAY_SECONDS", "0"))
 
 
 @app.get("/health")
@@ -31,6 +36,7 @@ def health():
 
 @app.post("/clone")
 async def clone(file: UploadFile):
+    time.sleep(DELAY_SECONDS * 3)
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty reference audio")
@@ -42,6 +48,7 @@ async def synthesize(text: str = Form(...), profile: UploadFile | None = None):
     if profile is None or not (await profile.read()).startswith(PROFILE_PREFIX):
         raise HTTPException(status_code=400, detail="Missing or invalid voice profile")
 
+    time.sleep(DELAY_SECONDS)
     seconds = max(0.5, len(text.split()) / WORDS_PER_SECOND)
     n = int(seconds * SAMPLE_RATE)
     frames = b"".join(

@@ -29,6 +29,13 @@ ffmpeg`. Already included in `Dockerfile`.
     → `partial` (playable, more still coming) → `cached` (fully done).
     Each checkpoint publish is atomic (`os.replace`), so a client mid-read
     never sees a half-written file.
+- **Survives restarts.** Voices, books, and finished chapter audio are
+  stored on disk (the `app-storage` volume in Docker) and in the database,
+  so stopping the app loses nothing. Work interrupted mid-way is recovered
+  at startup (`app/recovery.py`): a voice that was training is marked
+  failed with a retry prompt instead of staying stuck, and a chapter that
+  was generating resumes from the segments it already finished, so only
+  the missing ones are synthesized.
 - Three pluggable cloning/synthesis engines (`app/tts/`), picked via
   `TTS_ENGINE`:
   - `xtts` — in-process Coqui XTTS v2. Needs `requirements-tts.txt`
